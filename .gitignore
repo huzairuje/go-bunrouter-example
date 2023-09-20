@@ -1,0 +1,5 @@
+.idea/
+release/*
+config.yml
+logs/
+bin/*
