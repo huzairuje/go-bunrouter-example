@@ -37,7 +37,7 @@ func methodNotAllowedHandler(w http.ResponseWriter, req bunrouter.Request) error
 
 func (hr *HandlerRouter) RouterWithMiddleware() *bunrouter.Router {
 	//add new instance for bun router and add not found handler
-	// and method with not allowed handler
+	//and method with not allowed handler
 	c := bunrouter.New(
 		bunrouter.WithNotFoundHandler(notFoundHandler),
 		bunrouter.WithMethodNotAllowedHandler(methodNotAllowedHandler),

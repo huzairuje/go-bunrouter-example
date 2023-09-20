@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log"
 
+	"go-bunrouter-example/infrastructure/config"
+
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
-	"go-bunrouter-example/infrastructure/config"
 )
 
 type HandlerDatabase struct {
@@ -44,9 +45,7 @@ func loadPsqlDb(hostDB, portDB, userDB, passwordDB, dbName, appName string) (*bu
 	)
 
 	sqlDB := sql.OpenDB(pgConn)
-
 	db := bun.NewDB(sqlDB, pgdialect.New())
-
 	err := db.Ping()
 	if err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -8,6 +9,10 @@ import (
 
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	ErrMultipleKeyInCache = errors.New("error get multiple key in cache")
 )
 
 // NewRedisLibInterface initialize a redis client
@@ -53,7 +58,6 @@ func newLib(redisClient *redis.Client) LibInterface {
 func (r client) SetIdempotencyKey(key string, value interface{}, ttl time.Duration) (err error) {
 	valueInRedis := r.redisClient.Get(key).Val()
 	if len(valueInRedis) > 0 {
-		//err = primitive.ErrFoundInCache
 		return
 	}
 	success, err := r.redisClient.SetNX(key, value, ttl).Result()
@@ -61,7 +65,8 @@ func (r client) SetIdempotencyKey(key string, value interface{}, ttl time.Durati
 		return
 	}
 	if !success {
-		//err = primitive.ErrMultipleKeyInCache
+		err = ErrMultipleKeyInCache
+		return
 	}
 	return
 }

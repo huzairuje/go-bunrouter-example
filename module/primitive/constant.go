@@ -1,7 +1,5 @@
 package primitive
 
-import "errors"
-
 const (
 	SuccessCreateArticle             = "success record article"
 	SuccessGetArticle                = "success get record article"
@@ -11,8 +9,4 @@ const (
 	ErrorBindBodyRequest             = "error bind body from request"
 	SomethingWrongWithTheBodyRequest = "oops, something wrong with body request, please recheck!"
 	SomethingWentWrong               = "oops, something went wrong!"
-)
-
-var (
-	ErrRecordNotFound = errors.New("sql: no rows in result set")
 )
