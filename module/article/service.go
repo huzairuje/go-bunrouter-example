@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go-bunrouter-example/infrastructure/config"
 	"time"
 
 	"go-bunrouter-example/infrastructure/httplib"
@@ -52,18 +53,21 @@ func (s Service) RecordArticle(ctx context.Context, payload primitive.ArticleReq
 	}
 
 	//set data to redis on goroutine
-	go func() {
-		dataBytes, errMarshall := json.Marshal(data)
-		if errMarshall != nil {
-			logger.Error(ctx, utils.ErrorLogFormat, errMarshall.Error(), logCtx, "json.Marshal")
-		}
-		redisFinaleKey := fmt.Sprintf(redisFinaleKeyArticle, data.ID)
-		errSetToRedis := s.redis.Set(redisFinaleKey, dataBytes, time.Minute)
-		if errSetToRedis != nil {
-			logger.Error(ctx, utils.ErrorLogFormat, errSetToRedis.Error(), logCtx, "s.redis.Set")
-		}
-		fmt.Printf("success SET on redis by key: %s\n", redisFinaleKey)
-	}()
+
+	if config.Conf.Redis.EnableRedis && s.redis != nil {
+		go func() {
+			dataBytes, errMarshall := json.Marshal(data)
+			if errMarshall != nil {
+				logger.Error(ctx, utils.ErrorLogFormat, errMarshall.Error(), logCtx, "json.Marshal")
+			}
+			redisFinaleKey := fmt.Sprintf(redisFinaleKeyArticle, data.ID)
+			errSetToRedis := s.redis.Set(redisFinaleKey, dataBytes, time.Minute)
+			if errSetToRedis != nil {
+				logger.Error(ctx, utils.ErrorLogFormat, errSetToRedis.Error(), logCtx, "s.redis.Set")
+			}
+			fmt.Printf("success SET on redis by key: %s\n", redisFinaleKey)
+		}()
+	}
 
 	payloadResp := primitive.ArticleResp{
 		ID:        data.ID,
@@ -102,15 +106,17 @@ func (s Service) GetListArticle(ctx context.Context, param primitive.ParameterAr
 		paramQuery.SortBy,
 		paramQuery.SortOrder)
 
-	// Check if the data exists in the Redis cache
-	cacheData := s.redis.Get(cacheKey)
-	if cacheData != "" {
-		// If data exists in cache, decode it and return
-		if err := json.Unmarshal([]byte(cacheData), &resp); err != nil {
-			logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "json.Unmarshal")
+	if config.Conf.Redis.EnableRedis && s.redis != nil {
+		// Check if the data exists in the Redis cache
+		cacheData := s.redis.Get(cacheKey)
+		if cacheData != "" {
+			// If data exists in cache, decode it and return
+			if err := json.Unmarshal([]byte(cacheData), &resp); err != nil {
+				logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "json.Unmarshal")
+			}
+			count = int64(len(resp))
+			return resp, count, nil
 		}
-		count = int64(len(resp))
-		return resp, count, nil
 	}
 
 	// Data not found in cache, query the database
@@ -146,19 +152,21 @@ func (s Service) GetListArticle(ctx context.Context, param primitive.ParameterAr
 	}
 
 	// Store data in Redis cache for next time
-	if len(resp) > 0 {
-		go func() {
-			cacheDataBytes, errMarshal := json.Marshal(resp)
-			if errMarshal != nil {
-				logger.Error(ctx, utils.ErrorLogFormat, errMarshal.Error(), logCtx, "json.Marshal")
-			}
-			// Cache data for a reasonable amount of time (e.g., 1 hour)
-			errSetDataRedis := s.redis.Set(cacheKey, cacheDataBytes, time.Minute)
-			if errSetDataRedis != nil {
-				logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "s.redis.Set")
-			}
-			fmt.Printf("success SET on redis by key: %s\n", cacheKey)
-		}()
+	if config.Conf.Redis.EnableRedis && s.redis != nil {
+		if len(resp) > 0 {
+			go func() {
+				cacheDataBytes, errMarshal := json.Marshal(resp)
+				if errMarshal != nil {
+					logger.Error(ctx, utils.ErrorLogFormat, errMarshal.Error(), logCtx, "json.Marshal")
+				}
+				// Cache data for a reasonable amount of time (e.g., 1 hour)
+				errSetDataRedis := s.redis.Set(cacheKey, cacheDataBytes, time.Minute)
+				if errSetDataRedis != nil {
+					logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "s.redis.Set")
+				}
+				fmt.Printf("success SET on redis by key: %s\n", cacheKey)
+			}()
+		}
 	}
 
 	return resp, count, nil
@@ -170,15 +178,17 @@ func (s Service) GetDetailArticle(ctx context.Context, articleID int64) (primiti
 	var resp primitive.ArticleResp
 	cacheKey := fmt.Sprintf(redisFinaleKeyArticle, articleID)
 
-	// Check if the data exists in the Redis cache
-	cacheData := s.redis.Get(cacheKey)
-	if cacheData != "" {
-		// If data exists in cache, decode it and return
-		err := json.Unmarshal([]byte(cacheData), &resp)
-		if err != nil {
-			logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "json.Unmarshal")
+	if config.Conf.Redis.EnableRedis && s.redis != nil {
+		// Check if the data exists in the Redis cache
+		cacheData := s.redis.Get(cacheKey)
+		if cacheData != "" {
+			// If data exists in cache, decode it and return
+			err := json.Unmarshal([]byte(cacheData), &resp)
+			if err != nil {
+				logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "json.Unmarshal")
+			}
+			return resp, nil
 		}
-		return resp, nil
 	}
 
 	data, err := s.repository.FindArticleByID(ctx, articleID)
@@ -197,19 +207,21 @@ func (s Service) GetDetailArticle(ctx context.Context, articleID int64) (primiti
 	}
 
 	// Store data in Redis cache for next time
-	if resp.ID > 0 {
-		go func() {
-			cacheDataBytes, errMarshal := json.Marshal(resp)
-			if errMarshal != nil {
-				logger.Error(ctx, utils.ErrorLogFormat, errMarshal.Error(), logCtx, "json.Marshal")
-			}
-			// Cache data for a reasonable amount of time (e.g., 1 hour)
-			errSetDataRedis := s.redis.Set(cacheKey, cacheDataBytes, time.Minute)
-			if errSetDataRedis != nil {
-				logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "s.redis.Set")
-			}
-			fmt.Printf("success SET on redis by key: %s\n", cacheKey)
-		}()
+	if config.Conf.Redis.EnableRedis && s.redis != nil {
+		if resp.ID > 0 {
+			go func() {
+				cacheDataBytes, errMarshal := json.Marshal(resp)
+				if errMarshal != nil {
+					logger.Error(ctx, utils.ErrorLogFormat, errMarshal.Error(), logCtx, "json.Marshal")
+				}
+				// Cache data for a reasonable amount of time (e.g., 1 hour)
+				errSetDataRedis := s.redis.Set(cacheKey, cacheDataBytes, time.Minute)
+				if errSetDataRedis != nil {
+					logger.Error(ctx, utils.ErrorLogFormat, err.Error(), logCtx, "s.redis.Set")
+				}
+				fmt.Printf("success SET on redis by key: %s\n", cacheKey)
+			}()
+		}
 	}
 
 	return resp, nil

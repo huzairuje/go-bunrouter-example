@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"go-bunrouter-example/infrastructure/config"
 
 	logger "go-bunrouter-example/infrastructure/log"
 	"go-bunrouter-example/module/primitive"
@@ -33,10 +34,12 @@ func (u *Service) CheckUpTime(ctx context.Context) (primitive.HealthResp, error)
 		return primitive.HealthResp{}, errCheckDb
 	}
 
-	errCheckRedis := u.redisClient.Ping().Err()
-	if errCheckRedis != nil {
-		logger.Error(ctx, ctxName, "got error when %s : %v", ctxName, errCheckRedis)
-		return primitive.HealthResp{}, errCheckRedis
+	if config.Conf.Redis.EnableRedis && u.redisClient != nil {
+		errCheckRedis := u.redisClient.Ping().Err()
+		if errCheckRedis != nil {
+			logger.Error(ctx, ctxName, "got error when %s : %v", ctxName, errCheckRedis)
+			return primitive.HealthResp{}, errCheckRedis
+		}
 	}
 
 	return primitive.HealthResp{

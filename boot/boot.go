@@ -1,8 +1,6 @@
 package boot
 
 import (
-	"go-bunrouter-example/module/article"
-	"go-bunrouter-example/module/health"
 	"os"
 
 	"go-bunrouter-example/infrastructure/config"
@@ -10,8 +8,11 @@ import (
 	"go-bunrouter-example/infrastructure/limiter"
 	logger "go-bunrouter-example/infrastructure/log"
 	"go-bunrouter-example/infrastructure/redis"
+	"go-bunrouter-example/module/article"
+	"go-bunrouter-example/module/health"
 	"go-bunrouter-example/utils"
 
+	redisThirdPartyLib "github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,17 +32,20 @@ func MakeHandler() HandlerSetup {
 	var err error
 
 	//initiate a redis client
-	redisClient, err := redis.NewRedisClient(&config.Conf)
-	if err != nil {
-		log.Fatalf("failed initiate redis: %v", err)
-		os.Exit(1)
-	}
-
-	//initiate a redis library interface
-	redisLibInterface, err := redis.NewRedisLibInterface(redisClient)
-	if err != nil {
-		log.Fatalf("failed initiate redis library: %v", err)
-		os.Exit(1)
+	var redisClient *redisThirdPartyLib.Client
+	var redisLibInterface redis.LibInterface
+	if config.Conf.Redis.EnableRedis {
+		redisClient, err = redis.NewRedisClient(&config.Conf)
+		if err != nil {
+			log.Fatalf("failed initiate redis: %v", err)
+			os.Exit(1)
+		}
+		//initiate a redis library interface
+		redisLibInterface, err = redis.NewRedisLibInterface(redisClient)
+		if err != nil {
+			log.Fatalf("failed initiate redis library: %v", err)
+			os.Exit(1)
+		}
 	}
 
 	//setup infrastructure postgres
